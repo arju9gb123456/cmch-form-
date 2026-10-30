@@ -40,9 +40,14 @@ Bas — ab `admin.html` par us email/password se login karo.
 - `anon` key public rehne ke liye hi bani hai; **service_role key kabhi `config.js` me mat daalna.**
 - Is form me Aadhaar / Samagra / health data hai — admin password strong rakho aur export ki hui files share karte waqt dhyan rakho.
 
-## Deploy
+## Live link (GitHub Pages)
 
-Pure static site hai (koi build nahi). GitHub Pages, Vercel ya Netlify — kahin bhi chal jayega.
+- Form: https://arju9gb123456.github.io/cmch-form-/
+- Admin: https://arju9gb123456.github.io/cmch-form-/admin.html
+
+Pages `gh-pages` branch se serve hota hai. `main` par push karte hi GitHub Action (`.github/workflows/sync-pages.yml`) use `gh-pages` par copy kar deta hai, aur 1–2 minute me live site update ho jaati hai.
+
+Pure static site hai (koi build nahi) — Vercel ya Netlify par bhi chal jayega.
 
 ---
 Made by Arjun Ahirwar
