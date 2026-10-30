@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCH Tracking Form</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="fill-page">
+  <main class="sheet" id="app"><div class="center-note">Form load ho raha hai…</div></main>
+  <footer class="foot">Made by Arjun Ahirwar</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="assets/default-form.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    const app = document.getElementById("app");
+    const slug = (new URLSearchParams(location.search).get("f") || "rch").toLowerCase();
+    const ORG = (window.APP_CONFIG || {}).ORG_NAME || "";
+
+    (async () => {
+      let form;
+      try {
+        form = await DB.getActiveForm(slug);
+      } catch (e) {
+        app.innerHTML = `<div class="center-note">Form load nahi hua: ${esc(e.message)}</div>`;
+        return;
+      }
+      if (!form) {
+        app.innerHTML = `<div class="center-note"><h2>Form nahi mila</h2><p>Yeh form band hai ya link galat hai.</p></div>`;
+        return;
+      }
+      document.title = form.title;
+      renderForm(form);
+    })();
+
+    function renderForm(form) {
+      app.innerHTML = `
+        <header class="sheet-head">
+          ${ORG ? `<p class="org">${esc(ORG)}</p>` : ""}
+          <h1>${esc(form.title)}</h1>
+          ${form.subtitle ? `<p>${esc(form.subtitle)}</p>` : ""}
+        </header>
+        <form id="f" novalidate autocomplete="off">
+          <table class="grid">
+            <thead><tr><th class="sn">S.No.</th><th>Main Indicator</th><th>Fill Details</th></tr></thead>
+            <tbody>
+              ${form.fields.map((fl, i) => `
+                <tr data-field="${esc(fl.id)}">
+                  <td class="sn">${i + 1}</td>
+                  <td class="lbl"><label for="${esc(fl.id)}">${esc(fl.label)}${fl.required ? '<span class="req">*</span>' : ""}</label></td>
+                  <td class="val">${renderInput(fl)}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+          <div id="msg"></div>
+          <div class="actions">
+            <button type="button" class="btn ghost" id="clearBtn">Clear</button>
+            <button type="submit" class="btn primary" id="submitBtn">Submit Form</button>
+          </div>
+        </form>`;
+
+      const f = document.getElementById("f");
+      document.getElementById("clearBtn").onclick = () => {
+        if (confirm("Saari details clear kar dein?")) { f.reset(); clearErrors(); }
+      };
+      f.addEventListener("input", (e) => {
+        const tr = e.target.closest("tr.has-err");
+        if (tr) { tr.classList.remove("has-err"); tr.querySelector(".err-text")?.remove(); }
+      });
+      f.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearErrors();
+        const data = collectValues(form, f);
+        const errors = validateValues(form, data);
+        const keys = Object.keys(errors);
+        if (keys.length) {
+          keys.forEach((id) => {
+            const tr = f.querySelector(`tr[data-field="${CSS.escape(id)}"]`);
+            if (!tr) return;
+            tr.classList.add("has-err");
+            tr.querySelector("td.val").insertAdjacentHTML("beforeend", `<div class="err-text">${esc(errors[id])}</div>`);
+          });
+          document.getElementById("msg").innerHTML = `<p class="form-msg bad">${keys.length} field me galti hai — laal wale fields check karo.</p>`;
+          f.querySelector(`tr[data-field="${CSS.escape(keys[0])}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        if (!Object.values(data).some(Boolean)) {
+          document.getElementById("msg").innerHTML = `<p class="form-msg bad">Form khali hai.</p>`;
+          return;
+        }
+        const btn = document.getElementById("submitBtn");
+        btn.disabled = true; btn.textContent = "Submit ho raha hai…";
+        try {
+          await DB.submit(form.id, data);
+          showDone(form);
+        } catch (err) {
+          document.getElementById("msg").innerHTML = `<p class="form-msg bad">Submit nahi hua: ${esc(err.message)}. Dobara try karo.</p>`;
+          btn.disabled = false; btn.textContent = "Submit Form";
+        }
+      });
+    }
+
+    function clearErrors() {
+      document.querySelectorAll("tr.has-err").forEach((tr) => tr.classList.remove("has-err"));
+      document.querySelectorAll(".err-text").forEach((n) => n.remove());
+      const m = document.getElementById("msg"); if (m) m.innerHTML = "";
+    }
+
+    function showDone(form) {
+      app.innerHTML = `
+        <div class="done">
+          <div class="tick">✓</div>
+          <h2>Form submit ho gaya</h2>
+          <p>Details save ho gayi hain. Shukriya!</p>
+          <button class="btn primary" id="again">Naya form bharo</button>
+        </div>`;
+      window.scrollTo({ top: 0 });
+      document.getElementById("again").onclick = () => renderForm(form);
+    }
+  </script>
+</body>
+</html>
