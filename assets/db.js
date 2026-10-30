@@ -55,6 +55,7 @@
     async saveForm(form) {
       const row = {
         slug: form.slug, title: form.title, subtitle: form.subtitle || "",
+        title_hi: form.title_hi || "", subtitle_hi: form.subtitle_hi || "",
         fields: form.fields, is_active: !!form.is_active, updated_at: now()
       };
       if (CLOUD) {

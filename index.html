@@ -3,11 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RCH Tracking Form</title>
+  <meta name="theme-color" content="#2f8f97">
+  <title>RCH Tracking Form · Chirayu Medical College & Hospital</title>
+  <link rel="icon" href="assets/logo.jpg">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body class="fill-page">
-  <main class="sheet" id="app"><div class="center-note">Form load ho raha hai…</div></main>
+  <div class="page-band"></div>
+  <main class="sheet" id="app"><div class="center-note" id="loadingNote"></div></main>
   <footer class="foot">Made by Arjun Ahirwar</footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -19,62 +22,89 @@
     const app = document.getElementById("app");
     const slug = (new URLSearchParams(location.search).get("f") || "rch").toLowerCase();
     const ORG = (window.APP_CONFIG || {}).ORG_NAME || "";
+    const DRAFT_KEY = "cmchf_draft_" + slug;
+    let lang = getLang();
+    let FORM = null;
+    document.documentElement.lang = lang;
+    document.getElementById("loadingNote").textContent = T("loading", lang);
 
     (async () => {
-      let form;
       try {
-        form = await DB.getActiveForm(slug);
+        FORM = await DB.getActiveForm(slug);
       } catch (e) {
-        app.innerHTML = `<div class="center-note">Form load nahi hua: ${esc(e.message)}</div>`;
+        app.innerHTML = `<div class="center-note">${esc(T("loadFail", lang))} ${esc(e.message)}</div>`;
         return;
       }
-      if (!form) {
-        app.innerHTML = `<div class="center-note"><h2>Form nahi mila</h2><p>Yeh form band hai ya link galat hai.</p></div>`;
+      if (!FORM) {
+        app.innerHTML = `<div class="center-note"><img class="logo-lg" src="assets/logo.jpg" alt=""><h2>${esc(T("notFound", lang))}</h2><p>${esc(T("notFoundText", lang))}</p></div>`;
         return;
       }
-      document.title = form.title;
-      renderForm(form);
+      renderForm(loadDraft(), !!loadDraft());
     })();
 
-    function renderForm(form) {
+    /* ---------- draft autosave ---------- */
+    function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || null; } catch (e) { return null; } }
+    function saveDraft(data) {
+      try {
+        if (Object.values(data).some(Boolean)) localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+        else localStorage.removeItem(DRAFT_KEY);
+      } catch (e) {}
+    }
+    function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+
+    /* ---------- render ---------- */
+    function renderForm(values = null, restored = false) {
+      document.title = tx(FORM, "title", lang);
+      document.documentElement.lang = lang;
       app.innerHTML = `
-        <header class="sheet-head">
-          ${ORG ? `<p class="org">${esc(ORG)}</p>` : ""}
-          <h1>${esc(form.title)}</h1>
-          ${form.subtitle ? `<p>${esc(form.subtitle)}</p>` : ""}
-        </header>
+        <div class="sheet-top">${langToggle(lang)}</div>
+        ${sheetHeader(FORM, lang, ORG)}
+        <div class="progress" aria-live="polite"><div class="bar"><span id="pBar"></span></div><span id="pText"></span></div>
         <form id="f" novalidate autocomplete="off">
           <table class="grid">
-            <thead><tr><th class="sn">S.No.</th><th>Main Indicator</th><th>Fill Details</th></tr></thead>
-            <tbody>
-              ${form.fields.map((fl, i) => `
-                <tr data-field="${esc(fl.id)}">
-                  <td class="sn">${i + 1}</td>
-                  <td class="lbl"><label for="${esc(fl.id)}">${esc(fl.label)}${fl.required ? '<span class="req">*</span>' : ""}</label></td>
-                  <td class="val">${renderInput(fl)}</td>
-                </tr>`).join("")}
-            </tbody>
+            <thead><tr><th class="sn">${esc(T("sno", lang))}</th><th>${esc(T("indicator", lang))}</th><th>${esc(T("details", lang))}</th></tr></thead>
+            <tbody>${sheetRows(FORM, lang)}</tbody>
           </table>
+          <p class="req-note">${esc(T("requiredNote", lang))}</p>
           <div id="msg"></div>
           <div class="actions">
-            <button type="button" class="btn ghost" id="clearBtn">Clear</button>
-            <button type="submit" class="btn primary" id="submitBtn">Submit Form</button>
+            <button type="button" class="btn ghost" id="clearBtn">${esc(T("clear", lang))}</button>
+            <button type="submit" class="btn primary" id="submitBtn">${esc(T("submit", lang))}</button>
           </div>
         </form>`;
 
       const f = document.getElementById("f");
+      if (values) fillValues(FORM, f, values);
+      updateDerived(f);
+      if (restored) toast(T("draftRestored", lang));
+
+      document.querySelectorAll("#langToggle button").forEach((b) => {
+        b.onclick = () => {
+          if (b.dataset.lang === lang) return;
+          const current = collectValues(FORM, f);
+          lang = b.dataset.lang; setLang(lang);
+          renderForm(current);
+        };
+      });
+
       document.getElementById("clearBtn").onclick = () => {
-        if (confirm("Saari details clear kar dein?")) { f.reset(); clearErrors(); }
+        if (!confirm(T("clearConfirm", lang))) return;
+        f.reset(); clearErrors(); clearDraft(); updateDerived(f);
       };
+
       f.addEventListener("input", (e) => {
         const tr = e.target.closest("tr.has-err");
         if (tr) { tr.classList.remove("has-err"); tr.querySelector(".err-text")?.remove(); }
+        updateDerived(f);
+        saveDraft(collectValues(FORM, f));
       });
+      f.addEventListener("change", () => { updateDerived(f); saveDraft(collectValues(FORM, f)); });
+
       f.addEventListener("submit", async (e) => {
         e.preventDefault();
         clearErrors();
-        const data = collectValues(form, f);
-        const errors = validateValues(form, data);
+        const data = collectValues(FORM, f);
+        const errors = validateValues(FORM, data, lang);
         const keys = Object.keys(errors);
         if (keys.length) {
           keys.forEach((id) => {
@@ -83,23 +113,36 @@
             tr.classList.add("has-err");
             tr.querySelector("td.val").insertAdjacentHTML("beforeend", `<div class="err-text">${esc(errors[id])}</div>`);
           });
-          document.getElementById("msg").innerHTML = `<p class="form-msg bad">${keys.length} field me galti hai — laal wale fields check karo.</p>`;
+          document.getElementById("msg").innerHTML = `<p class="form-msg bad">${esc(T("fixErrors", lang, keys.length))}</p>`;
           f.querySelector(`tr[data-field="${CSS.escape(keys[0])}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
           return;
         }
         if (!Object.values(data).some(Boolean)) {
-          document.getElementById("msg").innerHTML = `<p class="form-msg bad">Form khali hai.</p>`;
+          document.getElementById("msg").innerHTML = `<p class="form-msg bad">${esc(T("empty", lang))}</p>`;
           return;
         }
         const btn = document.getElementById("submitBtn");
-        btn.disabled = true; btn.textContent = "Submit ho raha hai…";
+        btn.disabled = true; btn.textContent = T("submitting", lang);
         try {
-          await DB.submit(form.id, data);
-          showDone(form);
+          await DB.submit(FORM.id, data);
+          clearDraft();
+          showDone();
         } catch (err) {
-          document.getElementById("msg").innerHTML = `<p class="form-msg bad">Submit nahi hua: ${esc(err.message)}. Dobara try karo.</p>`;
-          btn.disabled = false; btn.textContent = "Submit Form";
+          document.getElementById("msg").innerHTML = `<p class="form-msg bad">${esc(T("failed", lang))} ${esc(err.message)}. ${esc(T("retry", lang))}</p>`;
+          btn.disabled = false; btn.textContent = T("submit", lang);
         }
+      });
+    }
+
+    function updateDerived(f) {
+      const data = collectValues(FORM, f);
+      const total = FORM.fields.length;
+      const filled = FORM.fields.filter((fl) => data[fl.id]).length;
+      document.getElementById("pBar").style.width = (total ? (filled / total) * 100 : 0) + "%";
+      document.getElementById("pText").textContent = T("progress", lang, filled, total);
+      document.querySelectorAll("[data-edd-for]").forEach((h) => {
+        const edd = eddFromLmp(data[h.dataset.eddFor]);
+        h.textContent = edd ? `${T("edd", lang)} ${edd}` : "";
       });
     }
 
@@ -109,16 +152,17 @@
       const m = document.getElementById("msg"); if (m) m.innerHTML = "";
     }
 
-    function showDone(form) {
+    function showDone() {
       app.innerHTML = `
         <div class="done">
+          <img class="logo-lg" src="assets/logo.jpg" alt="">
           <div class="tick">✓</div>
-          <h2>Form submit ho gaya</h2>
-          <p>Details save ho gayi hain. Shukriya!</p>
-          <button class="btn primary" id="again">Naya form bharo</button>
+          <h2>${esc(T("doneTitle", lang))}</h2>
+          <p>${esc(T("doneText", lang))}</p>
+          <button class="btn primary" id="again">${esc(T("again", lang))}</button>
         </div>`;
       window.scrollTo({ top: 0 });
-      document.getElementById("again").onclick = () => renderForm(form);
+      document.getElementById("again").onclick = () => renderForm();
     }
   </script>
 </body>

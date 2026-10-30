@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>Admin · RCH Forms</title>
+  <meta name="theme-color" content="#2c2873">
+  <title>Admin · RCH Forms · Chirayu</title>
+  <link rel="icon" href="assets/logo.jpg">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -12,6 +14,7 @@
 <!-- ============ LOGIN ============ -->
 <div id="login" class="login-wrap hidden">
   <form class="login-card" id="loginForm">
+    <img class="logo-lg" src="assets/logo.jpg" alt="Chirayu Medical College & Hospital">
     <h1>Admin Login</h1>
     <p class="sub">RCH Forms — submissions, export aur form builder</p>
     <label class="field" id="emailField"><span>Email</span><input type="email" id="lEmail" autocomplete="username"></label>
@@ -25,7 +28,7 @@
 <!-- ============ APP SHELL ============ -->
 <div id="shell" class="hidden">
   <header class="topbar">
-    <div class="brand">RCH Forms <small>Admin</small></div>
+    <div class="brand"><img src="assets/logo.jpg" alt=""><span class="brand-name">RCH Forms</span><small>Admin</small></div>
     <nav class="tabs">
       <button data-tab="subs" class="active">Submissions</button>
       <button data-tab="forms">Form Builder</button>
@@ -39,15 +42,28 @@
 
   <!-- Submissions -->
   <section class="page" id="tab-subs">
+    <div class="stats">
+      <div class="stat"><b id="stTotal">0</b><span>Total records</span></div>
+      <div class="stat"><b id="stToday">0</b><span>Aaj aaye</span></div>
+      <div class="stat"><b id="stWeek">0</b><span>Pichhle 7 din</span></div>
+    </div>
     <div class="toolbar">
       <select class="input" id="formSel" aria-label="Form"></select>
       <input class="input grow" id="search" type="search" placeholder="Search — naam, mobile, Aadhaar, kuch bhi…">
+      <div class="dates">
+        <input class="input" type="date" id="dFrom" title="Is tarikh se">
+        <span>to</span>
+        <input class="input" type="date" id="dTo" title="Is tarikh tak">
+      </div>
       <span class="count" id="count"></span>
+    </div>
+    <div class="toolbar">
       <div class="btn-group">
-        <button class="btn" id="xlsBtn" title="Excel file download">⬇ Excel</button>
-        <button class="btn" id="pdfTableBtn" title="Saare records ek table me">⬇ PDF (Table)</button>
-        <button class="btn" id="pdfFormsBtn" title="Har record alag page par, form jaisa">⬇ PDF (Form-wise)</button>
-        <button class="btn" id="refreshBtn" title="Refresh">↻</button>
+        <button class="btn primary" id="xlsBtn" title="Excel file download">⬇ Excel</button>
+        <button class="btn indigo" id="pdfTableBtn" title="Saare records ek table me">⬇ PDF (Table)</button>
+        <button class="btn indigo" id="pdfFormsBtn" title="Har record alag page par, form jaisa">⬇ PDF (Form-wise)</button>
+        <button class="btn" id="refreshBtn" title="Refresh">↻ Refresh</button>
+        <button class="btn ghost hidden" id="clearFilterBtn">✕ Filter hatao</button>
       </div>
     </div>
     <div class="panel"><div class="table-wrap" id="tableWrap"></div></div>
@@ -69,7 +85,7 @@
   <div class="dlg-body" id="viewBody"></div>
   <div class="dlg-foot">
     <button class="btn danger" id="viewDel">Delete</button>
-    <button class="btn" id="viewPdf">⬇ PDF</button>
+    <button class="btn indigo" id="viewPdf">⬇ PDF</button>
     <button class="btn primary" data-close>Close</button>
   </div>
 </dialog>
@@ -86,8 +102,10 @@
   <div class="builder">
     <div class="edit-col">
       <div class="meta-grid">
-        <label class="field full"><span>Form ka title</span><input id="bTitle" placeholder="e.g. Patient Feedback Form"></label>
-        <label class="field full"><span>Subtitle / instructions (optional)</span><input id="bSub" placeholder="e.g. Sabhi details sahi bharein"></label>
+        <label class="field"><span>Form title (English)</span><input id="bTitle" placeholder="e.g. Patient Feedback Form"></label>
+        <label class="field"><span>Form title (हिंदी) — optional</span><input id="bTitleHi" placeholder="जैसे मरीज़ फीडबैक फॉर्म"></label>
+        <label class="field"><span>Subtitle / instructions (English)</span><input id="bSub" placeholder="optional"></label>
+        <label class="field"><span>Subtitle (हिंदी)</span><input id="bSubHi" placeholder="optional"></label>
         <label class="field"><span>Form link</span>
           <div class="slug-row"><span>?f=</span><input id="bSlug" placeholder="my-form"></div>
         </label>
@@ -95,12 +113,12 @@
           <select id="bActive"><option value="1">Live (log bhar sakte hain)</option><option value="0">Band (hidden)</option></select>
         </label>
       </div>
-      <div class="fields-head"><h4>Fields (<span id="fCount">0</span>)</h4></div>
+      <div class="fields-head"><h4>Fields (<span id="fCount">0</span>)</h4><small>Hindi khali chhodoge toh English hi dikhega</small></div>
       <div id="fieldsList"></div>
       <button class="btn add-field" id="addFieldBtn">+ Field add karo</button>
     </div>
     <div class="preview-col">
-      <div class="preview-label">Live preview</div>
+      <div class="preview-bar"><span class="preview-label">Live preview</span><div id="pvLangWrap"></div></div>
       <div class="sheet" id="preview"></div>
     </div>
   </div>
@@ -117,7 +135,7 @@
 <script>
 const $ = (s, r = document) => r.querySelector(s);
 const ORG = (window.APP_CONFIG || {}).ORG_NAME || "";
-const state = { forms: [], formId: null, subs: [], filtered: [], viewing: null, draft: null, slugTouched: false };
+const state = { forms: [], formId: null, subs: [], filtered: [], viewing: null, draft: null, slugTouched: false, pvLang: "en", logo: null };
 
 /* ---------------- Boot / auth ---------------- */
 (async function boot() {
@@ -151,8 +169,23 @@ $("#logoutBtn").onclick = async () => { await DB.logout(); location.reload(); };
 
 async function start() {
   $("#shell").classList.remove("hidden");
+  loadLogoForPdf();
   await loadForms();
   await loadSubs();
+}
+
+// Logo as data URL for PDF headers
+function loadLogoForPdf() {
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0);
+      state.logo = { data: c.toDataURL("image/jpeg", 0.92), ratio: img.naturalHeight / img.naturalWidth };
+    } catch (e) { state.logo = null; }
+  };
+  img.src = "assets/logo.jpg";
 }
 
 /* ---------------- Tabs ---------------- */
@@ -181,6 +214,7 @@ async function loadForms() {
 
 const currentForm = () => state.forms.find((f) => f.id === state.formId);
 const formLink = (f) => new URL("index.html?f=" + encodeURIComponent(f.slug), location.href).href;
+const hasHindi = (f) => !!(f.title_hi || f.fields.some((x) => x.label_hi));
 
 function renderFormsList() {
   const box = $("#formsList");
@@ -188,8 +222,10 @@ function renderFormsList() {
   box.innerHTML = state.forms.map((f) => `
     <div class="card" data-id="${esc(f.id)}">
       <h3>${esc(f.title)}</h3>
+      ${f.title_hi ? `<div class="hi-title">${esc(f.title_hi)}</div>` : ""}
       <div class="meta">
         <span class="pill ${f.is_active ? "live" : "off"}">${f.is_active ? "LIVE" : "BAND"}</span>
+        ${hasHindi(f) ? `<span class="pill hi">EN + हिंदी</span>` : ""}
         <span>${f.fields.length} fields</span>
         <span>· ?f=${esc(f.slug)}</span>
       </div>
@@ -228,9 +264,9 @@ $("#formsList").addEventListener("click", async (e) => {
 });
 
 function uniqueSlug(base) {
-  let s = slugify(base) || "form", i = 2;
+  const s = slugify(base) || "form";
   const taken = new Set(state.forms.map((f) => f.slug));
-  let out = s;
+  let out = s, i = 2;
   while (taken.has(out)) out = `${s}-${i++}`;
   return out;
 }
@@ -238,7 +274,8 @@ function uniqueSlug(base) {
 /* ---------------- Submissions ---------------- */
 $("#formSel").onchange = async (e) => { state.formId = e.target.value; await loadSubs(); };
 $("#refreshBtn").onclick = async () => { await loadForms(); await loadSubs(); toast("Refresh ho gaya"); };
-$("#search").oninput = () => { applyFilter(); renderTable(); };
+["#search", "#dFrom", "#dTo"].forEach((s) => ($(s).oninput = () => { applyFilter(); renderTable(); }));
+$("#clearFilterBtn").onclick = () => { $("#search").value = ""; $("#dFrom").value = ""; $("#dTo").value = ""; applyFilter(); renderTable(); };
 
 async function loadSubs() {
   const f = currentForm();
@@ -249,10 +286,26 @@ async function loadSubs() {
   applyFilter(); renderTable();
 }
 
+const localDay = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
 function applyFilter() {
   const q = $("#search").value.trim().toLowerCase();
-  state.filtered = !q ? state.subs : state.subs.filter((s) => Object.values(s.data || {}).some((v) => String(v).toLowerCase().includes(q)));
-  $("#count").textContent = q ? `${state.filtered.length} / ${state.subs.length} records` : `${state.subs.length} records`;
+  const from = $("#dFrom").value, to = $("#dTo").value;
+  state.filtered = state.subs.filter((s) => {
+    const day = localDay(s.created_at);
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    if (q && !Object.values(s.data || {}).some((v) => String(v).toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const filtering = !!(q || from || to);
+  $("#clearFilterBtn").classList.toggle("hidden", !filtering);
+  $("#count").textContent = filtering ? `${state.filtered.length} / ${state.subs.length} records` : `${state.subs.length} records`;
+  const today = localDay(new Date().toISOString());
+  const weekAgo = Date.now() - 7 * 864e5;
+  $("#stTotal").textContent = state.subs.length;
+  $("#stToday").textContent = state.subs.filter((s) => localDay(s.created_at) === today).length;
+  $("#stWeek").textContent = state.subs.filter((s) => new Date(s.created_at).getTime() >= weekAgo).length;
 }
 
 function renderTable() {
@@ -260,7 +313,7 @@ function renderTable() {
   const wrap = $("#tableWrap");
   if (!f) { wrap.innerHTML = `<div class="empty">Pehle Form Builder me form banao.</div>`; return; }
   if (!state.filtered.length) {
-    wrap.innerHTML = `<div class="empty">${state.subs.length ? "Search se kuch match nahi hua." : "Abhi tak koi submission nahi aaya.<br><br>Form link: <a href='" + esc(formLink(f)) + "' target='_blank'>" + esc(formLink(f)) + "</a>"}</div>`;
+    wrap.innerHTML = `<div class="empty">${state.subs.length ? "Filter se kuch match nahi hua." : "Abhi tak koi submission nahi aaya.<br><br>Form link: <a href='" + esc(formLink(f)) + "' target='_blank'>" + esc(formLink(f)) + "</a>"}</div>`;
     return;
   }
   wrap.innerHTML = `<table class="data">
@@ -281,7 +334,9 @@ function openView(sub) {
   $("#viewTitle").textContent = sub.data?.[f.fields[1]?.id] || sub.data?.[f.fields[0]?.id] || "Record";
   $("#viewBody").innerHTML = `
     <p class="meta" style="margin:0 0 10px">Submitted: ${esc(fmtStamp(sub.created_at))}</p>
-    <table class="view"><tbody>${f.fields.map((fl, i) => `<tr><td>${i + 1}</td><td>${esc(fl.label)}</td><td>${esc(fmtValue(fl, sub.data?.[fl.id])) || "—"}</td></tr>`).join("")}</tbody></table>`;
+    <table class="view"><tbody>${f.fields.map((fl, i) => `
+      ${fl.section ? `<tr class="sec-row"><td colspan="3">${esc(fl.section)}</td></tr>` : ""}
+      <tr><td>${i + 1}</td><td>${esc(fl.label)}</td><td>${esc(fmtValue(fl, sub.data?.[fl.id])) || "—"}</td></tr>`).join("")}</tbody></table>`;
   $("#viewDlg").showModal();
 }
 $("#viewPdf").onclick = () => state.viewing && pdfForms([state.viewing], "record");
@@ -293,6 +348,7 @@ $("#viewDel").onclick = async () => {
 
 /* ---------------- Exports ---------------- */
 const stamp = () => new Date().toISOString().slice(0, 10);
+const TEAL = [47, 143, 151], INDIGO = [44, 40, 115], TEAL_SOFT = [227, 243, 244];
 function needRows() {
   if (!currentForm()) { toast("Koi form select nahi hai", "bad"); return null; }
   if (!state.filtered.length) { toast("Export karne ke liye koi record nahi hai", "bad"); return null; }
@@ -304,8 +360,7 @@ $("#xlsBtn").onclick = () => {
   const f = currentForm();
   const header = ["S.No.", "Submitted At", ...f.fields.map((fl, i) => `${i + 1}. ${fl.label}`)];
   const aoa = [header, ...rows.map((s, i) => [i + 1, fmtStamp(s.created_at), ...f.fields.map((fl) => fmtValue(fl, s.data?.[fl.id]))])];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  // Long digit strings (Aadhaar, mobile, Samagra) stay as text so Excel doesn't mangle them
+  const ws = XLSX.utils.aoa_to_sheet(aoa);   // values stay text, so Aadhaar / mobile don't turn into 1.23E+11
   ws["!cols"] = header.map((h, i) => ({ wch: i === 0 ? 6 : Math.min(40, Math.max(12, h.length * 0.8)) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Submissions");
@@ -313,20 +368,39 @@ $("#xlsBtn").onclick = () => {
   toast(`${rows.length} records Excel me export ho gaye`);
 };
 
+// Logo + org + title band at the top of a PDF page; returns y below it
+function pdfHeader(doc, f, left, right, y0 = 26) {
+  const W = doc.internal.pageSize.getWidth();
+  const logoW = 46;
+  if (state.logo) doc.addImage(state.logo.data, "JPEG", left, y0, logoW, logoW * state.logo.ratio);
+  const cx = W / 2;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...TEAL);
+  if (ORG) doc.text(ORG.toUpperCase(), cx, y0 + 12, { align: "center" });
+  doc.setTextColor(...INDIGO); doc.setFontSize(12);
+  const lines = doc.splitTextToSize(f.title, W - left - right - logoW * 2 - 20);
+  doc.text(lines, cx, y0 + 28, { align: "center" });
+  let y = y0 + 28 + (lines.length - 1) * 14;
+  if (f.subtitle) { doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(80); y += 13; doc.text(f.subtitle, cx, y, { align: "center" }); }
+  y = Math.max(y + 10, y0 + (state.logo ? logoW * state.logo.ratio + 6 : 0));
+  doc.setDrawColor(...INDIGO); doc.setLineWidth(1.2); doc.line(left, y, W - right, y);
+  return y + 8;
+}
+
 $("#pdfTableBtn").onclick = () => {
   const rows = needRows(); if (!rows) return;
   const f = currentForm();
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
-  doc.setFontSize(13); doc.text(f.title, 30, 32);
-  doc.setFontSize(9); doc.setTextColor(110);
-  doc.text(`${ORG ? ORG + "  ·  " : ""}${rows.length} records  ·  Exported ${new Date().toLocaleString("en-IN")}`, 30, 48);
+  let y = pdfHeader(doc, f, 30, 30);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(110);
+  doc.text(`${rows.length} records  ·  Exported ${new Date().toLocaleString("en-IN")}`, 30, y + 4);
   doc.autoTable({
-    startY: 60, margin: { left: 30, right: 30 },
+    startY: y + 12, margin: { left: 30, right: 30 },
     head: [["#", "Submitted", ...f.fields.map((fl, i) => `${i + 1}. ${fl.label}`)]],
     body: rows.map((s, i) => [i + 1, fmtStamp(s.created_at), ...f.fields.map((fl) => fmtValue(fl, s.data?.[fl.id]))]),
     styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak", minCellWidth: 50 },
-    headStyles: { fillColor: [20, 33, 61], fontSize: 7 },
+    headStyles: { fillColor: INDIGO, fontSize: 7 },
+    alternateRowStyles: { fillColor: [246, 250, 251] },
     columnStyles: { 0: { minCellWidth: 22, cellWidth: 22 } },
     horizontalPageBreak: true, horizontalPageBreakRepeat: 0,
     didDrawPage: () => {
@@ -346,20 +420,19 @@ function pdfForms(rows, tag) {
   const W = doc.internal.pageSize.getWidth();
   rows.forEach((s, idx) => {
     if (idx) doc.addPage();
-    if (ORG) { doc.setFontSize(8); doc.setTextColor(110); doc.text(ORG.toUpperCase(), W / 2, 34, { align: "center" }); }
-    doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(11.5);
-    const titleLines = doc.splitTextToSize(f.title, W - 80);
-    doc.text(titleLines, W / 2, 52, { align: "center" });
-    let y = 52 + titleLines.length * 14;
-    if (f.subtitle) { doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(f.subtitle, W / 2, y, { align: "center" }); y += 12; }
+    const y = pdfHeader(doc, f, 40, 40);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110);
-    doc.text(`Submitted: ${fmtStamp(s.created_at)}`, W - 40, y + 4, { align: "right" });
+    doc.text(`Submitted: ${fmtStamp(s.created_at)}`, W - 40, y + 2, { align: "right" });
+    const body = [];
+    f.fields.forEach((fl, i) => {
+      if (fl.section) body.push([{ content: fl.section.toUpperCase(), colSpan: 3, styles: { fillColor: TEAL_SOFT, textColor: [35, 114, 122], fontStyle: "bold", fontSize: 7.5 } }]);
+      body.push([i + 1, fl.label, fmtValue(fl, s.data?.[fl.id])]);
+    });
     doc.autoTable({
-      startY: y + 10, margin: { left: 40, right: 40 }, theme: "grid",
-      head: [["S.No.", "Main Indicator", "Fill Details"]],
-      body: f.fields.map((fl, i) => [i + 1, fl.label, fmtValue(fl, s.data?.[fl.id])]),
-      styles: { fontSize: 8.5, cellPadding: 4, lineColor: [40, 40, 40], lineWidth: 0.5, textColor: 20 },
-      headStyles: { fillColor: [235, 238, 244], textColor: 20, fontStyle: "bold" },
+      startY: y + 8, margin: { left: 40, right: 40 }, theme: "grid",
+      head: [["S.No.", "Main Indicator", "Fill Details"]], body,
+      styles: { fontSize: 8.3, cellPadding: 3.6, lineColor: [63, 61, 107], lineWidth: 0.5, textColor: 20 },
+      headStyles: { fillColor: INDIGO, textColor: 255, fontStyle: "bold" },
       columnStyles: { 0: { cellWidth: 38, halign: "center" }, 1: { cellWidth: 250 } }
     });
   });
@@ -370,17 +443,23 @@ function pdfForms(rows, tag) {
 }
 
 /* ---------------- Form builder ---------------- */
+const newFieldId = () => "f_" + DB.newId().replace(/-/g, "").slice(0, 8);
+
 $("#newFormBtn").onclick = () => openBuilder({
-  title: "", subtitle: "", slug: "", is_active: true,
-  fields: [{ id: "f_" + DB.newId().slice(0, 8), label: "Naam", type: "text", required: true }]
+  title: "", title_hi: "", subtitle: "", subtitle_hi: "", slug: "", is_active: true,
+  fields: [{ id: newFieldId(), label: "Name", label_hi: "नाम", type: "text", required: true }]
 }, false);
 
 function openBuilder(form, slugTouched = true) {
   state.draft = structuredClone(form);
+  state.draft.fields.forEach((f) => (f._sec = !!(f.section || f.section_hi)));
   state.slugTouched = !!form.id || slugTouched;
+  state.pvLang = "en";
   $("#editTitle").textContent = form.id ? "Form edit karo" : "Naya form";
   $("#bTitle").value = form.title || "";
+  $("#bTitleHi").value = form.title_hi || "";
   $("#bSub").value = form.subtitle || "";
+  $("#bSubHi").value = form.subtitle_hi || "";
   $("#bSlug").value = form.slug || "";
   $("#bActive").value = form.is_active === false ? "0" : "1";
   renderFields(); renderPreview();
@@ -392,23 +471,40 @@ $("#bTitle").oninput = (e) => {
   if (!state.slugTouched) { state.draft.slug = uniqueSlug(e.target.value); $("#bSlug").value = state.draft.slug; }
   renderPreview();
 };
+$("#bTitleHi").oninput = (e) => { state.draft.title_hi = e.target.value; renderPreview(); };
 $("#bSub").oninput = (e) => { state.draft.subtitle = e.target.value; renderPreview(); };
+$("#bSubHi").oninput = (e) => { state.draft.subtitle_hi = e.target.value; renderPreview(); };
 $("#bSlug").oninput = (e) => { state.slugTouched = true; state.draft.slug = e.target.value; };
 $("#bSlug").onblur = (e) => { state.draft.slug = slugify(e.target.value); e.target.value = state.draft.slug; };
 $("#bActive").onchange = (e) => { state.draft.is_active = e.target.value === "1"; };
 
+const csv = (arr) => esc((arr || []).join(", "));
+
 function renderFields() {
   const fl = state.draft.fields;
   $("#fCount").textContent = fl.length;
-  $("#fieldsList").innerHTML = fl.map((f, i) => `
+  $("#fieldsList").innerHTML = fl.map((f, i) => {
+    const hasPh = ["text", "textarea", "number", "tel", "email"].includes(f.type);
+    return `
     <div class="frow" data-i="${i}">
       <div class="num">${i + 1}</div>
       <div class="main">
-        <input class="input" data-k="label" value="${esc(f.label)}" placeholder="Question / label">
+        ${f._sec ? `
+          <input class="input half" data-k="section" value="${esc(f.section || "")}" placeholder="Section heading (English)">
+          <input class="input half hi-in" data-k="section_hi" value="${esc(f.section_hi || "")}" placeholder="सेक्शन (हिंदी)">` : ""}
+        <input class="input" data-k="label" value="${esc(f.label)}" placeholder="Question / label (English)">
         <select class="input" data-k="type">${FIELD_TYPES.map((t) => `<option value="${t.v}" ${t.v === f.type ? "selected" : ""}>${t.l}</option>`).join("")}</select>
-        ${NEEDS_OPTIONS.includes(f.type) ? `<input class="input opts" data-k="options" value="${esc((f.options || []).join(", "))}" placeholder="Options comma se alag karo — e.g. Male, Female">` : ""}
-        ${["text", "textarea", "number", "tel", "email"].includes(f.type) ? `<input class="input wide" data-k="placeholder" value="${esc(f.placeholder || "")}" placeholder="Hint text (optional)">` : ""}
-        <div class="sub"><label><input type="checkbox" data-k="required" ${f.required ? "checked" : ""}> Zaroori (required)</label></div>
+        <input class="input wide hi-in" data-k="label_hi" value="${esc(f.label_hi || "")}" placeholder="Label हिंदी में (optional)">
+        ${NEEDS_OPTIONS.includes(f.type) ? `
+          <input class="input wide" data-k="options" value="${csv(f.options)}" placeholder="Options comma se alag — e.g. Male, Female">
+          <input class="input wide hi-in" data-k="options_hi" value="${csv(f.options_hi)}" placeholder="Options हिंदी में, same order — जैसे लड़का, लड़की">` : ""}
+        ${hasPh ? `
+          <input class="input half" data-k="placeholder" value="${esc(f.placeholder || "")}" placeholder="Hint text (optional)">
+          <input class="input half hi-in" data-k="placeholder_hi" value="${esc(f.placeholder_hi || "")}" placeholder="Hint हिंदी में">` : ""}
+        <div class="sub">
+          <label><input type="checkbox" data-k="required" ${f.required ? "checked" : ""}> Zaroori (required)</label>
+          <button type="button" class="link" data-act="sec">${f._sec ? "− Section heading hatao" : "＋ Upar section heading"}</button>
+        </div>
       </div>
       <div class="tools">
         <button data-act="up" title="Upar" ${i === 0 ? "disabled" : ""}>↑</button>
@@ -416,22 +512,25 @@ function renderFields() {
         <button data-act="dup" title="Copy">⧉</button>
         <button data-act="del" class="del" title="Hatao">✕</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
+const LIST_KEYS = ["options", "options_hi"];
 $("#fieldsList").addEventListener("input", (e) => {
   const row = e.target.closest(".frow"); const k = e.target.dataset.k; if (!row || !k) return;
   const f = state.draft.fields[+row.dataset.i];
   if (k === "required") f.required = e.target.checked;
-  else if (k === "options") f.options = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+  else if (LIST_KEYS.includes(k)) f[k] = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
   else if (k === "type") {
     f.type = e.target.value;
     if (NEEDS_OPTIONS.includes(f.type) && !(f.options || []).length) f.options = ["Option 1", "Option 2"];
-    delete f.pattern; delete f.patternMsg;
+    // old format checks don't fit a new type
+    delete f.pattern; delete f.patternMsg; delete f.patternMsg_hi; delete f.hint;
     renderFields();
   } else {
     f[k] = e.target.value;
-    if (k === "placeholder" && !f[k]) delete f[k];
+    if (!f[k]) delete f[k];
   }
   renderPreview();
 });
@@ -439,10 +538,19 @@ $("#fieldsList").addEventListener("input", (e) => {
 $("#fieldsList").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const i = +b.closest(".frow").dataset.i; const fl = state.draft.fields;
-  if (b.dataset.act === "up" && i > 0) [fl[i - 1], fl[i]] = [fl[i], fl[i - 1]];
-  if (b.dataset.act === "down" && i < fl.length - 1) [fl[i + 1], fl[i]] = [fl[i], fl[i + 1]];
-  if (b.dataset.act === "dup") fl.splice(i + 1, 0, { ...structuredClone(fl[i]), id: "f_" + DB.newId().slice(0, 8), label: fl[i].label + " (copy)" });
-  if (b.dataset.act === "del") {
+  const act = b.dataset.act;
+  if (act === "up" && i > 0) [fl[i - 1], fl[i]] = [fl[i], fl[i - 1]];
+  if (act === "down" && i < fl.length - 1) [fl[i + 1], fl[i]] = [fl[i], fl[i + 1]];
+  if (act === "dup") {
+    const c = structuredClone(fl[i]);
+    c.id = newFieldId(); c.label = fl[i].label + " (copy)"; delete c.section; delete c.section_hi; c._sec = false;
+    fl.splice(i + 1, 0, c);
+  }
+  if (act === "sec") {
+    const f = fl[i]; f._sec = !f._sec;
+    if (!f._sec) { delete f.section; delete f.section_hi; }
+  }
+  if (act === "del") {
     if (!confirm(`"${fl[i].label || "Field"}" hatana hai? Is field ka purana data export me nahi dikhega.`)) return;
     fl.splice(i, 1);
   }
@@ -450,7 +558,7 @@ $("#fieldsList").addEventListener("click", (e) => {
 });
 
 $("#addFieldBtn").onclick = () => {
-  state.draft.fields.push({ id: "f_" + DB.newId().slice(0, 8), label: "", type: "text", required: false });
+  state.draft.fields.push({ id: newFieldId(), label: "", type: "text", required: false });
   renderFields(); renderPreview();
   const rows = document.querySelectorAll("#fieldsList .frow");
   const last = rows[rows.length - 1];
@@ -459,28 +567,34 @@ $("#addFieldBtn").onclick = () => {
 };
 
 function renderPreview() {
-  const d = state.draft;
+  const d = state.draft, lang = state.pvLang;
+  $("#pvLangWrap").innerHTML = langToggle(lang, "pvLang");
+  document.querySelectorAll("#pvLang button").forEach((b) => (b.onclick = () => { state.pvLang = b.dataset.lang; renderPreview(); }));
   $("#preview").innerHTML = `
-    <header class="sheet-head">
-      ${ORG ? `<p class="org">${esc(ORG)}</p>` : ""}
-      <h1>${esc(d.title || "Form title")}</h1>
-      ${d.subtitle ? `<p>${esc(d.subtitle)}</p>` : ""}
-    </header>
-    <table class="grid"><thead><tr><th class="sn">S.No.</th><th>Main Indicator</th><th>Fill Details</th></tr></thead>
-    <tbody>${d.fields.map((f, i) => `<tr><td class="sn">${i + 1}</td><td class="lbl">${esc(f.label || "—")}${f.required ? '<span class="req">*</span>' : ""}</td><td class="val">${renderInput(f, "pv_")}</td></tr>`).join("")}</tbody></table>`;
+    ${sheetHeader(d, lang, ORG)}
+    <table class="grid"><thead><tr><th class="sn">${esc(T("sno", lang))}</th><th>${esc(T("indicator", lang))}</th><th>${esc(T("details", lang))}</th></tr></thead>
+    <tbody>${sheetRows(d, lang, "pv_")}</tbody></table>`;
 }
 
 $("#saveFormBtn").onclick = async () => {
-  const d = state.draft;
-  d.title = d.title.trim(); d.slug = slugify(d.slug);
-  if (!d.title) return toast("Form ka title daalo", "bad");
+  const d = structuredClone(state.draft);
+  d.title = (d.title || "").trim(); d.slug = slugify(d.slug);
+  if (!d.title) return toast("Form ka English title daalo", "bad");
   if (!d.slug) return toast("Form link (slug) daalo", "bad");
   if (!d.fields.length) return toast("Kam se kam ek field chahiye", "bad");
   const blank = d.fields.findIndex((f) => !String(f.label || "").trim());
-  if (blank >= 0) return toast(`Field #${blank + 1} ka label khali hai`, "bad");
+  if (blank >= 0) return toast(`Field #${blank + 1} ka English label khali hai`, "bad");
   const noOpts = d.fields.findIndex((f) => NEEDS_OPTIONS.includes(f.type) && !(f.options || []).length);
   if (noOpts >= 0) return toast(`Field #${noOpts + 1} me options daalo`, "bad");
-  d.fields.forEach((f) => (f.label = f.label.trim()));
+  const badHi = d.fields.findIndex((f) => NEEDS_OPTIONS.includes(f.type) && (f.options_hi || []).length && f.options_hi.length !== f.options.length);
+  if (badHi >= 0) return toast(`Field #${badHi + 1}: Hindi options ki ginti English jitni honi chahiye`, "bad");
+  d.fields.forEach((f) => {
+    delete f._sec;
+    f.label = f.label.trim();
+    ["label_hi", "section", "section_hi", "placeholder", "placeholder_hi"].forEach((k) => { if (typeof f[k] === "string") { f[k] = f[k].trim(); if (!f[k]) delete f[k]; } });
+    if (!NEEDS_OPTIONS.includes(f.type)) { delete f.options; delete f.options_hi; }
+    else if (!(f.options_hi || []).length) delete f.options_hi;
+  });
   const btn = $("#saveFormBtn"); btn.disabled = true;
   try {
     const saved = await DB.saveForm(d);
